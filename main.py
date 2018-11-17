@@ -19,6 +19,10 @@ def pandas_main():
     print(start_series[:10])
     print(ia_series[:10])
 
+    metrics_df = pd.read_csv('data/output.csv')
+    sns.pairplot(metrics_df)
+    plt.savefig('test.png')
+
     if LATEX_FLAG:
         plt.style.use('ggplot')
 
@@ -65,7 +69,7 @@ def csv_main():
             if index == 0:
                 previous_start = int(row[0])
 
-            ia = (int(row[0]) - previous_start)*1e-4
+            ia = (int(row[0]) - previous_start) * 1e-4
             previous_start = int(row[0]) * 1e-4
             service = int(row[6]) * 1e-4
 
@@ -73,12 +77,12 @@ def csv_main():
             s_arr.append(service)
 
             ia_variance = ia_variance + (index / (index + 1) * (ia - ia_mean) ** 2)
-            s_variance = s_variance + (index / (index + 1) * (service - s_mean)**2)
+            s_variance = s_variance + (index / (index + 1) * (service - s_mean) ** 2)
             ia_variance_arr.append(ia_variance)
             s_variance_arr.append(s_variance)
 
-            ia_mean = ia_mean + (ia - ia_mean)/(index+1)
-            s_mean = s_mean + (service - s_mean)/(index+1)
+            ia_mean = ia_mean + (ia - ia_mean) / (index + 1)
+            s_mean = s_mean + (service - s_mean) / (index + 1)
             ia_mean_arr.append(ia_mean)
             s_mean_arr.append(s_mean)
 
@@ -90,12 +94,12 @@ def csv_main():
             if ia_mean == 0:
                 ia_cv = 0
             else:
-                ia_cv = ia_std_dev/ia_mean
-            s_cv = s_std_dev/s_mean
+                ia_cv = ia_std_dev / ia_mean
+            s_cv = s_std_dev / s_mean
             ia_cv_arr.append(ia_cv)
             s_cv_arr.append(s_cv)
 
-            process_arr.append(index+1)
+            process_arr.append(index + 1)
 
     # with open('no_metrics.csv', 'w', newline='') as csvfile:
     #     csv_writer = csv.writer(csvfile, delimiter=',')
@@ -121,7 +125,13 @@ def csv_main():
     #
     # plt.savefig('output/variance_ia.png')
 
-    sns.scatterplot(x='Process', y='Interarrival Mean', data=(process_arr[:1000], ia_mean_arr[:1000]))
+    mean_process = pd.DataFrame(
+        {"Process": process_arr,
+         "Interarrival Mean": ia_mean_arr,
+         "Service Mean": s_mean_arr
+         })
+
+    sns.scatterplot(x='Process', y='Interarrival Mean', data=mean_process[:1000])
     plt.savefig('output/ia_mean_seaborn.png')
 
     # plt.title("CDF of Interarrival Times")
@@ -141,4 +151,4 @@ def csv_main():
 
 
 if __name__ == "__main__":
-    csv_main()
+    pandas_main()
