@@ -1,6 +1,6 @@
 import csv
 import math
-from matplotlib import rc
+from matplotlib import rc,rcParams
 import matplotlib.pyplot as plt
 from statsmodels.graphics.tsaplots import plot_acf
 import pandas as pd
@@ -16,21 +16,20 @@ def pandas_main():
     ia_series = proj3_df['Timestamp'].diff() * 1e-4
     service_series = proj3_df['ResponseTime'] * 1e-4
 
-    print(start_series[:10])
-    print(ia_series[:10])
-
-    metrics_df = pd.read_csv('data/output.csv')
-    sns.pairplot(metrics_df)
-    plt.savefig('test.png')
+    # metrics_df = pd.read_csv('data/output.csv')
+    # sns.pairplot(metrics_df[:100])
+    # plt.savefig('test.png')
 
     if LATEX_FLAG:
         plt.style.use('ggplot')
 
         rc('font', **{'family': 'serif'})
         rc('text', usetex=True)
+        pgf_with_rc_fonts = {"pgf.texsystem": "pdflatex"}
+        rcParams.update(pgf_with_rc_fonts)
 
-    # plot_acf(service_series, lags=10)
-    # plt.savefig('s_autocorr.png')
+    plot_acf(ia_series[:100], lags=10)
+    plt.savefig('output/autocorr/ia_autocorr_ms_test.png')
 
 
 def csv_main():
@@ -127,12 +126,11 @@ def csv_main():
 
     mean_process = pd.DataFrame(
         {"Process": process_arr,
-         "Interarrival Mean": ia_mean_arr,
-         "Service Mean": s_mean_arr
+         "Service Mean (ms)": s_mean_arr
          })
 
-    sns.scatterplot(x='Process', y='Interarrival Mean', data=mean_process[:1000])
-    plt.savefig('output/ia_mean_seaborn.png')
+    sns.scatterplot(x='Process', y='Service Mean (ms)', data=mean_process)
+    plt.savefig('output/s_mean_seaborn_ms.png')
 
     # plt.title("CDF of Interarrival Times")
     # plt.hist(ia_arr, 10000, density=True, cumulative=True)
