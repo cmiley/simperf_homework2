@@ -1,24 +1,70 @@
 import csv
 import math
-from matplotlib import rc,rcParams
+from matplotlib import rc, rcParams
 import matplotlib.pyplot as plt
 from statsmodels.graphics.tsaplots import plot_acf
 import pandas as pd
 import seaborn as sns
+import warnings
+import numpy as np
 
 LATEX_FLAG = True
+USE_MS_FLAG = True
+PLOT_AUTOCORRELATION = False
+PLOT_DISTRIBUTIONS = False
+PLOT_TRANSIENT = True
+PRINT_STATS = True
+
+
+def get_transient_metrics(df):
+    mean = []
+    std = []
+    var = []
+    cv = []
+
+    for index, item in enumerate(df):
+        mean.append(df[:index].mean())
+        std.append(df[:index].std())
+        var.append(df[:index].var())
+        cv_val = float(df[:index].std / df[:index].mean())
+        cv.append(cv_val)
+
+    return np.array([mean, std, var, cv])
 
 
 def pandas_main():
     proj3_df = pd.read_csv('data/proj_3.csv', header=None)
     proj3_df.columns = ['Timestamp', 'Hostname', 'DiskNumber', 'Type', 'Offset', 'Size', 'ResponseTime']
-    start_series = proj3_df['Timestamp'] * 1e-4
-    ia_series = proj3_df['Timestamp'].diff() * 1e-4
-    service_series = proj3_df['ResponseTime'] * 1e-4
 
-    # metrics_df = pd.read_csv('data/output.csv')
-    # sns.pairplot(metrics_df[:100])
-    # plt.savefig('test.png')
+    ias_df = proj3_df[['Timestamp', 'ResponseTime']].copy()
+    ias_df['Timestamp'] = ias_df['Timestamp'].diff()
+    ias_df.columns = ['Interarrival', 'Service']
+
+    if USE_MS_FLAG:
+        multiplier = 1e-4
+        scale = '(ms)'
+    else:
+        multiplier = 1e-7
+        scale = '(s)'
+
+    ias_df *= multiplier
+
+    ia_series = ias_df['Interarrival']
+    service_series = ias_df['Service']
+
+    if PRINT_STATS:
+        print('Interarrival {}: \n'.format(scale) +
+              '   Mean..........: {}\n'.format(ia_series.mean()) +
+              '   Std. Dev......: {}\n'.format(ia_series.std()) +
+              '   Variance......: {}\n'.format(ia_series.var()) +
+              '   CV............: {}'.format(ia_series.std() / ia_series.mean()))
+        print('Service {}: \n'.format(scale) +
+              '   Mean..........: {}\n'.format(service_series.mean()) +
+              '   Std. Dev......: {}\n'.format(service_series.std()) +
+              '   Variance......: {}\n'.format(service_series.var()) +
+              '   CV............: {}'.format(service_series.std() / service_series.mean()))
+
+    f_scale = scale[1:-1]
 
     if LATEX_FLAG:
         plt.style.use('ggplot')
@@ -28,8 +74,91 @@ def pandas_main():
         pgf_with_rc_fonts = {"pgf.texsystem": "pdflatex"}
         rcParams.update(pgf_with_rc_fonts)
 
-    plot_acf(ia_series[:100], lags=10)
-    plt.savefig('output/autocorr/ia_autocorr_ms_test.png')
+    # Plot Autocorrelations
+    if PLOT_AUTOCORRELATION:
+        ia_auto_fig, ia_auto_ax = plt.subplots()
+        plot_acf(ia_series, ax=ia_auto_ax, lags=50, fft=True)
+        ia_auto_ax.set_title('Autocorrelation of Interarrival Times {}'.format(scale))
+        ia_auto_ax.set_ylabel('Correlation')
+        ia_auto_ax.set_xlabel('Lag')
+        ia_auto_fig.savefig('output/autocorr/ia_autocorr_{}.png'.format(f_scale))
+
+        s_auto_fig, s_auto_ax = plt.subplots()
+        plot_acf(service_series, ax=s_auto_ax, lags=50, fft=True)
+        s_auto_ax.set_title('Autocorrelation of Service Times {}'.format(scale))
+        s_auto_ax.set_xlabel('Lag')
+        s_auto_ax.set_ylabel('Correlation')
+        s_auto_fig.savefig('output/autocorr/s_autocorr_{}.png'.format(f_scale))
+
+    # Plot Distributions
+    if PLOT_DISTRIBUTIONS:
+        with warnings.catch_warnings():
+            bins = 100
+
+            # Histograms
+            fig, ax = plt.subplots()
+            sns.distplot(service_series, bins=bins, kde=False, ax=ax)
+            ax.set_title('Distribution of Service Times {}'.format(scale))
+            ax.set_xlabel('Service Time {}'.format(scale))
+            ax.set_ylabel('Count')
+            fig.savefig('output/histogram/service_hist_{}_{}.png'.format(bins, f_scale))
+
+            fig, ax = plt.subplots()
+            sns.distplot(ia_series, bins=bins, kde=False, ax=ax)
+            ax.set_title('Distribution of Interarrival Times {}'.format(scale))
+            ax.set_xlabel('Interarrival Time {}'.format(scale))
+            ax.set_ylabel('Count')
+            fig.savefig('output/histogram/ia_hist_{}_{}.png'.format(bins, f_scale))
+
+            fig, ax = plt.subplots()
+            sns.distplot(service_series, kde=False, ax=ax)
+            ax.set_title('Distribution of Service Times {}'.format(scale))
+            ax.set_xlabel('Service Time {}'.format(scale))
+            ax.set_ylabel('Count')
+            fig.savefig('output/histogram/service_hist_{}.png'.format(f_scale))
+
+            fig, ax = plt.subplots()
+            sns.distplot(ia_series[1:], kde=False, ax=ax)
+            ax.set_title('Distribution of Interarrival Times {}'.format(scale))
+            ax.set_xlabel('Interarrival Time {}'.format(scale))
+            ax.set_ylabel('Count')
+            fig.savefig('output/histogram/ia_hist_{}.png'.format(f_scale))
+
+            # Cumulative Distributions
+            fig, ax = plt.subplots()
+            sns.distplot(service_series, bins=bins, hist_kws=dict(cumulative=True),
+                         kde_kws=dict(cumulative=True), ax=ax)
+            ax.set_title('CDF of Service Times {}'.format(scale))
+            ax.set_xlabel('Service Time {}'.format(scale))
+            ax.set_ylabel('Cumulative Probability')
+            fig.savefig('output/cdf/service_cdf_{}_{}.png'.format(bins, f_scale))
+
+            fig, ax = plt.subplots()
+            sns.distplot(ia_series[1:], bins=bins, hist_kws=dict(cumulative=True),
+                         kde_kws=dict(cumulative=True), ax=ax)
+            ax.set_title('CDF of Interarrival Times {}'.format(scale))
+            ax.set_xlabel('Interarrival Time {}'.format(scale))
+            ax.set_ylabel('Cumulative Probability')
+            fig.savefig('output/cdf/ia_cdf_{}_{}.png'.format(bins, f_scale))
+
+            fig, ax = plt.subplots()
+            sns.distplot(service_series, hist_kws=dict(cumulative=True),
+                         kde_kws=dict(cumulative=True), ax=ax)
+            ax.set_title('CDF of Service Times {}'.format(scale))
+            ax.set_xlabel('Service Time {}'.format(scale))
+            ax.set_ylabel('Cumulative Probability')
+            fig.savefig('output/cdf/service_cdf_{}.png'.format(f_scale))
+
+            fig, ax = plt.subplots()
+            sns.distplot(ia_series[1:], hist_kws=dict(cumulative=True),
+                         kde_kws=dict(cumulative=True), ax=ax)
+            ax.set_title('CDF of Interarrival Times {}'.format(scale))
+            ax.set_xlabel('Interarrival Time {}'.format(scale))
+            ax.set_ylabel('Cumulative Probability')
+            fig.savefig('output/cdf/ia_cdf_{}.png'.format(f_scale))
+
+    if PLOT_TRANSIENT:
+        print(get_transient_metrics(ia_series[:100]))
 
 
 def csv_main():
